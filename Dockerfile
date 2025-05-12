@@ -1,27 +1,42 @@
-# Base image
+# Use a smaller Python base image
 FROM python:3.12-slim
 
-# Avoid interactive prompts
-ENV DEBIAN_FRONTEND=noninteractive
+# Avoid writing .pyc files and buffer stdout/stderr
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # Set working directory
 WORKDIR /app
 
-# Install OS dependencies
-RUN apt-get update && apt-get install -y \
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     git \
-    && rm -rf /var/lib/apt/lists/*
+    curl \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
+# Install Python dependencies step-by-step to reduce memory spikes
 COPY requirements.txt .
+
+# Upgrade pip first
 RUN pip install --upgrade pip
+
+# Install core dependencies separately to reduce Docker layer size
+RUN pip install --no-cache-dir \
+    streamlit \
+    pandas \
+    numpy \
+    faiss-cpu \
+    torch \
+    transformers
+
+# Now install remaining dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the app
+# Copy application code
 COPY . .
 
-# Expose the port Streamlit runs on
+# Expose the Streamlit default port
 EXPOSE 8501
 
 # Run the app
